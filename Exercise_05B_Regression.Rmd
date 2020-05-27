@@ -1,6 +1,8 @@
 ---
 title: "Exercise 05B - Bayesian Regression"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r,echo=FALSE}
@@ -66,7 +68,7 @@ y <- rnorm(n,x%*%beta,sigma)
 
 As you can see, in the third line of this code we generate pseudodata for the response variable, y, by taking n samples from a random normal distribution that has a mean that is the expected value of our regression model and the standard deviation we specified above.
 
-  Once we've generated our pseudodata lets do some “exploratory data analysis” to look at the data we've generated and the model that it came from
+Once we've generated our pseudodata lets do some “exploratory data analysis” to look at the data we've generated and the model that it came from
 
 ```{r}
 plot(x1,y)
@@ -103,7 +105,7 @@ model{
 
 Now that we have “data” and the model, the next task in setting up the analysis is to specify the parameters for the prior distributions.  
 
-Since beta is a vector, the prior mean, b0, is also a vector, and the prior variance is a matrix.  Since we have no prior conceptions about our data we'll select relatively weak priors, assuming a prior mean of 0 and a prior variance matrix that is diagonal (i.e. no covariances) and with a moderately large variance of 10000 (s.d. of 100).  We'll use the _diag_ command to set up a diagonal matrix that has a size of 2 and values of 10000 along the diagonal.  In practice, JAGS requires that we specify the multivariate normal in terms of a precision matrix, therefore we will compute the inverse of the prior variance matrix, vinvert,  using the _solve_ function.  For the residual error, we will specify an uninformative gamma prior on the precision with parameters s1 = 0.1 and s2 = 0.1. Finally, we'l add all of these prior parameters to the `data` object so we can pass them in to the JAGS model
+Since beta is a vector, the prior mean, b0, is also a vector, and the prior variance is a matrix.  Since we have no prior conceptions about our data we'll select relatively weak priors, assuming a prior mean of 0 and a prior variance matrix that is diagonal (i.e. no covariances) and with a moderately large variance of 10000 (s.d. of 100).  We'll use the _diag_ command to set up a diagonal matrix that has a size of 2 and values of 10000 along the diagonal.  In practice, JAGS requires that we specify the multivariate normal in terms of a precision matrix, therefore we will compute the inverse of the prior variance matrix, vinvert,  using the _solve_ function.  For the residual error, we will specify an uninformative gamma prior on the precision with parameters s1 = 0.1 and s2 = 0.1. Finally, we'll add all of these prior parameters to the `data` object so we can pass them in to the JAGS model
 
 ```{r}
 ## specify priors
@@ -172,6 +174,35 @@ cor(var.mat)    ## correlation matrix among model parameters
 * Describe and explain the parameter covariances that you observe in the pairs plot and parameter correlation matrix.
 * Compare the summary statistics for the Bayesian regression model to those from the classical regression:  summary(lm( y ~ x1 )).  This should include a comparison of the means and uncertainties of **all 3 model parameters**
 * Compare the fit parameters to the “true” parameters we used to generate the pseudo-data.  How well does the statistical analysis recover the true model?
+
+```{r}
+# María
+# Determine and remove burnin
+burnin <- 100
+var.burn <- window(var.out,start=burnin)
+
+# Parameter summary table
+summary(var.burn)
+
+# Plot marginal distributions
+??
+
+# Parameter covariances and parameter correlation matrix
+var.burn.mat      <- as.matrix(var.burn)
+pairs(var.burn.mat)	## to evaluate parameter correlation
+cor(var.burn.mat)  
+
+# Compare the summary statistics for the Bayesian regression model to those from the classical regression:  summary(lm( y ~ x1 )).  This should include a comparison of the means and uncertainties of **all 3 model parameters**
+
+classical_reg <- lm( y ~ x1 )
+summary(classical_reg) # can we see the prec (or sd) here?
+# comparison of uncertainties??
+
+# Compare the fit parameters to the “true” parameters we used to generate the pseudo-data.  How well does the statistical analysis recover the true model?
+b0
+b1
+1/sigma
+```
 
 # Regression Credible Intervals
 
@@ -244,7 +275,7 @@ x2 <- runif(n,0,15)
 x <- cbind(rep(1,n),x1,x2,x1*x2)
 y <- rnorm(n,x%*%beta,sigma)
 plot(x1,y)
-plot(x2,y)
+plot(x2,y) # María: why to use same y for different x?
 ```
 
 Extend your univariate regression model to a multiple regression.
@@ -259,3 +290,61 @@ Hints: Make sure the length/dimensions of your priors and initial conditions mat
 * Plot marginal and pairwise joint distributions. Indicate 'true' parameters on the plots
 * Compare the fit parameters to the “true” parameters we used to generate the pseudo-data.  How well does the statistical analysis recover the true model?
 
+```{r}
+# María
+# Declare model
+multivariate_regression <- "
+model{
+
+  beta ~ dmnorm(c(b0, b1, b2, b3), Vb)  	## multivariate Normal prior on vector of regression params
+  prec ~ dgamma(s1,s2)    ## prior precision
+
+  for(i in 1:n){
+	  mu[i] <- beta[1] + beta[2]*x1[i] + beta[3]*x2[i] + beta[4]*x1[i]*x2[i]   	## process model - correct?
+	  y[i]  ~ dnorm(mu[i], prec)		        ## data model
+  }
+}
+"
+
+## specify priors
+data <- list()
+data$b0 <- b0      ## regression beta means
+data$b1 <- b1      ## regression beta means
+data$b2 <- b2      ## regression beta means
+data$b3 <- b3      ## regression beta means
+data$Vb <- solve(diag(10000,4))   ## regression beta precisions
+data$s1 <- 0.1     ## ??
+data$s2 <- 0.1     ## ??
+data$n <- n
+data$x1 <- x1      ## ??
+data$x2 <- x2      ## ??
+
+## initial conditions
+nchain = 3
+inits <- list()
+for(i in 1:nchain){
+ inits[[i]] <- list(beta = rnorm(4,0,5), prec = runif(1,1/100,1/20))
+}
+
+# Run model
+j.model.task2  <- jags.model(file = textConnection(multivariate_regression),
+                             data = data,
+                             inits = inits,
+                             n.chains = nchain)
+
+# Sample from the posterior
+var.out.task2   <- coda.samples (model = j.model.task2,
+                            variable.names = c("beta","prec"),
+                                n.iter = 2000)
+
+GBR <- gelman.plot(var.out.task2)
+
+## convert to matrix
+var.mat.task2      <- as.matrix(var.out.task2)
+
+## Pairwise scatter plots & correlation
+pairs(var.mat.task2)	## pairs plot to evaluate parameter correlation
+cor(var.mat.task2)    ## correlation matrix among model parameters
+
+summary(var.out.task2) # No burning or thinning applied
+```

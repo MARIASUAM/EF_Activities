@@ -2,13 +2,16 @@
 title: "Introduction to JAGS"
 author: "Michael Dietze"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r,echo=FALSE}
+# install.packages("rjags")
 library(rjags)
+# install.packages("coda")
 library(coda)
 ```
-
 
 # Introduction
 

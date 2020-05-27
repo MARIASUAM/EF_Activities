@@ -282,15 +282,50 @@ data = list(
 
 ### Activity Task 1
 Run the unknown mean/fixed variance model to estimate mean tree diameter. Include the following in your results:
-
 * Table of summary statistics for the posterior estimate of the mean
 * Graph of parameter density
 * Plot of MCMC “history”
 * Length of your MCMC (i.e. the total number of “updates”), the number of chains, the burnin values you used, the effective sample size, and any graphs/statistics/rationale you used to justify those settings
 
+```{r}
+# María
+# Run the model
+nr_chains <- 3
+j.model.trees <- jags.model (file = textConnection(NormalMeanN),
+                             data = data, n.chains = nr_chains)
+
+# Sample from the model
+jags.out.trees <- coda.samples (model = j.model.trees,
+                          variable.names = c("mu"), n.iter = 5000)
+
+# Visual assessment of MCMC outputs
+plot(jags.out.trees) # MCMC history on the left, parameter density on the right side
+
+# Table of summary statistics for the posterior estimate of the mean (no burning and thinning applied)
+summary(jags.out.trees)
+
+# Burn-in analysis
+GBR <- gelman.plot(jags.out)
+burnin = 100
+jags.burn.trees <- window(jags.out.trees,start=burnin)
+plot(jags.burn.trees) # MCMC history on the left, parameter density on the right side after burn-in has been discarded
+
+# Correlation
+acfplot(jags.burn.trees)
+
+# Effective sample size
+effectiveSize(jags.burn.trees)
+
+# Length of your MCMC (i.e. the total number of “updates”)
+??
+  
+# Settings: the number of chains, burnin
+nr_chains
+burnin
+```
+
 ### Activity Task 2
 Modify the model to account for the uncertainty in the variance. This only requires adding one line — a prior on S outside the loop.
-
 Run the unknown mean/unknown variance model to simultaneously estimate both the mean tree diameter and the standard deviation. Include the following in your results:
 
 * Explanation of your choice of prior on the precision
@@ -299,6 +334,29 @@ Run the unknown mean/unknown variance model to simultaneously estimate both the 
 * Plot of MCMC “history”
 * Length of your MCMC (i.e. the total number of “updates”), the number of chains, burnin, effective sample size, and any graphs/statistics/rationale you used to justify those settings
 * Also describe any changes in the distribution of the mean (shape, location, tails) compared to Task 1.
-  
 
+```{r}
+# María
+# Model definition: S as gamma distributed? s1 and s2 values??
+NormalMeanN_unknownVariance <- "
+model {
+  mu ~ dnorm(mu0,T) # prior on the mean 
+  S ~ dgamma(s1,s2) ## prior precision
+  for(i in 1:N){
+    X[i] ~ dnorm(mu,S) # data model
+  }
+}
+"
 
+# Run the model
+nr_chains <- 3
+j.model.trees.unkownvar <- jags.model (file = textConnection(NormalMeanN_unknownVariance), data = data, n.chains = nr_chains)
+data$s1 <- 0.1
+data$s2 <- 0.1
+
+# Sample from the model
+jags.out.trees.unkownvar <- coda.samples (model = j.model.trees.unkownvar, variable.names = c("mu", "S"), n.iter = 5000)
+
+plot(jags.out.trees.unkownvar)
+summary(jags.out.trees.unkownvar)
+```
